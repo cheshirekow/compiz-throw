@@ -203,7 +203,6 @@ throwWindowMoveNotify (CompWindow *w,
 		tw->time = 1;
 		tw->totaldx = 0;
 		tw->xVelocity = 0.0f;
-		fprintf(stderr, "reset x\n");
 	    }
 	    if (( tw->lastdy < -3 && dy > 3 ) ||
 		( tw->lastdy > 3 && dy < -3 ))
@@ -211,7 +210,6 @@ throwWindowMoveNotify (CompWindow *w,
 		tw->time = 1;
 		tw->totaldy = 0;
 		tw->yVelocity = 0.0f;
-		fprintf(stderr, "reset y\n");
 	    }
 	    tw->totaldx += dx;
 	    tw->totaldy += dy;
