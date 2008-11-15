@@ -103,9 +103,11 @@ throwPreparePaintScreen (CompScreen *s,
         tw->xVelocity /= 1.25;
 	tw->yVelocity /= 1.25;
 
-	if (!tw->moving)
+	if (!tw->moving && (
+	    (tw->xVelocity < 0.0f || tw->xVelocity > 0.0f) ||
+	    (tw->yVelocity < 0.0f || tw->yVelocity > 0.0)))
 	{
-	    moveWindow (w, roundf(tw->xVelocity * (ms / 10)), roundf (tw->yVelocity * (ms / 10)), TRUE, TRUE);
+	    moveWindow (w, roundf(tw->xVelocity * (ms / 10)), roundf (tw->yVelocity * (ms / 10)), TRUE, FALSE);
 	    syncWindowPosition (w);
 	}
 
