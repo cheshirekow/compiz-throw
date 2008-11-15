@@ -85,6 +85,12 @@ typedef struct _ThrowWindow
                        GET_THROW_SCREEN  (w->screen,            \
                        GET_THROW_DISPLAY (w->screen->display)))
 
+#define WIN_REAL_X(w) (w->attrib.x - w->input.left)
+#define WIN_REAL_Y(w) (w->attrib.y - w->input.top)
+
+#define WIN_REAL_W(w) (w->width + w->input.left + w->input.right)
+#define WIN_REAL_H(w) (w->height + w->input.top + w->input.bottom)
+
 /*  Handle the velocity */
 static void
 throwPreparePaintScreen (CompScreen *s,
@@ -100,14 +106,32 @@ throwPreparePaintScreen (CompScreen *s,
 	if (tw->moving)
 	    tw->time += ms;
 
-        tw->xVelocity /= 1.25;
-	tw->yVelocity /= 1.25;
+        tw->xVelocity /= (1.0 + (throwGetFrictionConstant (s) / 100));
+	tw->yVelocity /= (1.0 + (throwGetFrictionConstant (s) / 100));
 
 	if (!tw->moving && (
 	    (tw->xVelocity < 0.0f || tw->xVelocity > 0.0f) ||
 	    (tw->yVelocity < 0.0f || tw->yVelocity > 0.0)))
 	{
-	    moveWindow (w, roundf(tw->xVelocity * (ms / 10)), roundf (tw->yVelocity * (ms / 10)), TRUE, FALSE);
+	    int dx = roundf(tw->xVelocity * (ms / 10) * (throwGetVelocityX (s) / 10));
+	    int dy = roundf (tw->yVelocity * (ms / 10) * (throwGetVelocityY (s) / 10));
+
+	    if (throwGetConstrainX (s))
+	    {
+		if ((WIN_REAL_X (w) + dx) < 0)
+		    dx = 0;
+		else if ((WIN_REAL_X (w) + WIN_REAL_W (w) + dx) > w->screen->width)
+		    dx = 0;
+	    }
+	    if (throwGetConstrainY (s))
+	    {
+		if ((WIN_REAL_Y (w) + dy) < 0)
+		    dy = 0;
+		else if ((WIN_REAL_Y (w) + WIN_REAL_H (w) + dy) > w->screen->height)
+		    dy = 0;
+	    }
+
+	    moveWindow (w, dx, dy, TRUE, FALSE);
 	    syncWindowPosition (w);
 	}
 
