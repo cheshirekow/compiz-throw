@@ -55,10 +55,6 @@ typedef struct _ThrowWindow
     float		   xVelocity;
     float		   yVelocity;
     int			   time;
-    int			   lastdx;
-    int			   lastdy;
-    int			   totaldx;
-    int			   totaldy;
     Bool		   moving;
 } ThrowWindow;
 
@@ -103,13 +99,13 @@ throwPreparePaintScreen (CompScreen *s,
 	if (tw->moving)
 	    tw->time += ms;
 
-        tw->xVelocity /= (1.0 + (throwGetFrictionConstant (s) / 100));
-	tw->yVelocity /= (1.0 + (throwGetFrictionConstant (s) / 100));
-
 	if (!tw->moving && (
 	    (tw->xVelocity < 0.0f || tw->xVelocity > 0.0f) ||
 	    (tw->yVelocity < 0.0f || tw->yVelocity > 0.0)))
 	{
+
+	    tw->xVelocity /= (1.0 + (throwGetFrictionConstant (s) / 100));
+	    tw->yVelocity /= (1.0 + (throwGetFrictionConstant (s) / 100));
 	    int dx = roundf(tw->xVelocity * (ms / 10) * (throwGetVelocityX (s) / 10));
 	    int dy = roundf (tw->yVelocity * (ms / 10) * (throwGetVelocityY (s) / 10));
 
@@ -178,10 +174,6 @@ throwWindowGrabNotify (CompWindow   *w,
 	tw->moving = TRUE;
 
 	tw->time = 0;
-	tw->lastdx = 0;
-	tw->lastdy = 0;
-	tw->totaldx = 0;
-	tw->totaldy = 0;
 	tw->xVelocity = 0.0f;
 	tw->yVelocity = 0.0f;
     }
@@ -218,29 +210,13 @@ throwWindowMoveNotify (CompWindow *w,
     if (tw->moving)
     {
 
-	    if (( tw->lastdx < 0 && dx > 0 ) ||
-		( tw->lastdx > 0 && dx < 0 ))
-	    {
-		tw->time = 1;
-		tw->totaldx = 0;
-		tw->xVelocity = 0.0f;
-	    }
-	    if (( tw->lastdy < -3 && dy > 3 ) ||
-		( tw->lastdy > 3 && dy < -3 ))
-	    {
-		tw->time = 1;
-		tw->totaldy = 0;
-		tw->yVelocity = 0.0f;
-	    }
-	    tw->totaldx += dx;
-	    tw->totaldy += dy;
+	if (tw->time < 1)
+	    tw->time = 1;
 
-	    tw->xVelocity = (tw->totaldx) / ((float) tw->time / 50);
-	    tw->yVelocity = (tw->totaldy) / ((float) tw->time / 50);
+	tw->xVelocity = dx / tw->time;
+	tw->yVelocity = dy / tw->time;
+	tw->time = 1;
     }
-
-    tw->lastdx = dx;
-    tw->lastdy = dy;
 
     UNWRAP (ts, w->screen, windowMoveNotify);
     (*w->screen->windowMoveNotify) (w, dx, dy, immediate);
