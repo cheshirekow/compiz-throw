@@ -303,10 +303,6 @@ throwInitWindow (CompPlugin *p,
 
     tw->xVelocity = 0.0f;
     tw->yVelocity = 0.0f;
-    tw->lastdx = 0;
-    tw->lastdy = 0;
-    tw->totaldx = 0;
-    tw->totaldy = 0;
     tw->moving = FALSE;
     tw->time = 0;
 
