@@ -24,13 +24,14 @@
  */
 
 #include <core/core.h>
-#include <core/privatehandler.h>
+#include <core/pluginclasshandler.h>
+
 #include <composite/composite.h>
 
 class ThrowScreen :
     public ScreenInterface,
     public CompositeScreenInterface,
-    public PrivateHandler <ThrowScreen, CompScreen>,
+    public PluginClassHandler <ThrowScreen, CompScreen>,
     public ThrowOptions
 {
     public:
@@ -47,7 +48,7 @@ class ThrowScreen :
 
 class ThrowWindow :
 	public WindowInterface,
-	public PrivateHandler <ThrowWindow, CompWindow>
+	public PluginClassHandler <ThrowWindow, CompWindow>
 {
 	public:
 
@@ -90,8 +91,4 @@ class ThrowPluginVTable :
     public:
 
 	bool init ();
-			
-	PLUGIN_OPTION_HELPER (ThrowScreen);
 };
-	
-COMPIZ_PLUGIN_20081216 (throw, ThrowPluginVTable); // 'throw' is a reserved keyword

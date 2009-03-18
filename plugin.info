@@ -1,3 +1,0 @@
-PLUGIN = throw
-PKG_DEP = compiz-composite
-LD_FLAGS = -Wl, -rpath /opt/compiz/lib/compiz

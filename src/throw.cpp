@@ -28,6 +28,8 @@
 
 #define PI 3.1415926
 
+COMPIZ_PLUGIN_20090315 (throw, ThrowPluginVTable); // 'throw' is a reserved keyword
+
 void
 ThrowScreen::preparePaint (int ms)
 {
@@ -53,7 +55,7 @@ ThrowScreen::preparePaint (int ms)
 
 	    tw->xVelocity /= (1.0 + (optionGetFrictionConstant () / 100));
 	    tw->yVelocity /= (1.0 + (optionGetFrictionConstant () / 100));
-	    int dx = roundf(tw->xVelocity * (optionGetVelocityX ()));
+	    int dx = roundf (tw->xVelocity * (optionGetVelocityX ()));
 	    int dy = roundf (tw->yVelocity * (optionGetVelocityY ()));
 
 	    if (optionGetConstrainX ())
@@ -152,8 +154,7 @@ ThrowWindow::moveNotify (int  dx,
 /* Constructor */
 
 ThrowScreen::ThrowScreen (CompScreen *screen) :
-    PrivateHandler<ThrowScreen, CompScreen> (screen),
-    ThrowOptions (throwVTable->getMetadata ()),
+    PluginClassHandler<ThrowScreen, CompScreen> (screen),
     cScreen (CompositeScreen::get (screen)),
     windows ()
 {
@@ -162,7 +163,7 @@ ThrowScreen::ThrowScreen (CompScreen *screen) :
 }
 
 ThrowWindow::ThrowWindow (CompWindow *window) :
-    PrivateHandler<ThrowWindow, CompWindow> (window),
+    PluginClassHandler<ThrowWindow, CompWindow> (window),
     window (window),
     cWindow (CompositeWindow::get (window)),
     xVelocity (0.0f),

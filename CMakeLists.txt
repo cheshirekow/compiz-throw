@@ -1,3 +1,5 @@
-include (CompizFusion)
+find_package (Compiz REQUIRED)
 
-compiz_fusion_plugin (throw PLUGINDEPS composite)
+include (CompizPlugin)
+
+compiz_plugin (throw PLUGINDEPS composite)
