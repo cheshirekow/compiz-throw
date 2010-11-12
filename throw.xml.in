@@ -5,11 +5,11 @@
     <_long>Windows have a velocity once they are released after moving</_long>
 	<category>Utility</category>
 	<deps>
-		<relation type="after">
-			<plugin>resize</plugin>
-		</relation>
+	    <relation type="after">
+		<plugin>resize</plugin>
+	    </relation>
 	</deps>
-    <screen>
+    <options>
      <group>
 	<option type="float" name="velocity_x">
 	    <_short>X Velocity Multiplier</_short>
@@ -43,6 +43,6 @@
 	    <default>true</default>
 	</option>
       </group>
-    </screen>
+    </options>
   </plugin>
 </compiz>
