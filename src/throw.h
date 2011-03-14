@@ -79,11 +79,11 @@ class ThrowWindow :
 #define THROW_WINDOW(w)							\
     ThrowWindow *tw = ThrowWindow::get (w)
 
-#define WIN_REAL_X(w) (w->x () - w->input ().left)
-#define WIN_REAL_Y(w) (w->y () - w->input ().top)
+#define WIN_REAL_X(w) (w->x () - w->border ().left)
+#define WIN_REAL_Y(w) (w->y () - w->border ().top)
 
-#define WIN_REAL_W(w) (w->width () + w->input ().left + w->input ().right)
-#define WIN_REAL_H(w) (w->height () + w->input ().top + w->input ().bottom)
+#define WIN_REAL_W(w) (w->width () + w->border ().left + w->border ().right)
+#define WIN_REAL_H(w) (w->height () + w->border ().top + w->border ().bottom)
 
 class ThrowPluginVTable :
     public CompPlugin::VTableForScreenAndWindow<ThrowScreen, ThrowWindow>
