@@ -1,4 +1,7 @@
 /*
+ * Copyright © 2011 Josh Bialkowski
+ * 
+ * Original code:
  * Copyright © 2009 Sam Spilsbury
  *
  * Permission to use, copy, modify, distribute, and sell this software
@@ -20,7 +23,23 @@
  * NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
  * WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
+ * Author: Josh Bialkowski <jbialk@mit.edu>
+ * 
+ * original:
  * Author: Sam Spilsbury <smspillaz@gmail.com
+ *
+ * How the plugin works:
+ * The plugin recognizes three different states for a top-level window:
+ * "grabbing", "grabbed", "ungrabbing", and "ungrabbed". At each frame of
+ * compiz rendering, we do different things depending on the state.
+ * * In the "grabbed" state, we sample how much the user has moved the window
+ *   since the last frame, and record that delta to a ring buffer
+ * * In the "released" state, we simulate the dynamics of the window
+ *
+ * In addition to the frame callback from compiz, we also perform actions on
+ * movement events from the user.
+ * * In the "grabbed" state we update the current position of the window, so
+ *   that we can record a delta in the frame
  */
 
 #include <core/core.h>
@@ -28,6 +47,13 @@
 
 #include <composite/composite.h>
 
+
+/**
+ *  If I'm understanding this correctly, a ThrowScreen object is a wrapper
+ *  for a compiz native screen object. We create one of these objects and
+ *  associate it with a compiz screen object so that we can add some data to
+ *  the compiz object
+ */
 class ThrowScreen :
     public ScreenInterface,
     public CompositeScreenInterface,
@@ -35,60 +61,111 @@ class ThrowScreen :
     public ThrowOptions
 {
     public:
+        CompositeScreen *cScreen;
+        CompWindowList windows;
 
-	ThrowScreen (CompScreen *s);
-
-	CompositeScreen *cScreen;
-
-	CompWindowList windows;
-
-	void preparePaint (int);
-	void donePaint ();
+        ThrowScreen (CompScreen *s);
+        void preparePaint (int ms);
+        void donePaint ();
 };
 
+
+
+/**
+ *  Like ThrowScreen, a wrapper object which adds data to the compiz data 
+ *  structure for a window. A window is a top-level application window, meaning
+ *  a child (in the sense of X) of the root window... or the window manager 
+ *  (in this case compiz)
+ */
 class ThrowWindow :
-	public WindowInterface,
-	public PluginClassHandler <ThrowWindow, CompWindow>
+    public WindowInterface,
+    public PluginClassHandler <ThrowWindow, CompWindow>
 {
-	public:
+    public:
+        //forward declaration, see definition below
+        class State;
 
-	    ThrowWindow (CompWindow *w);
+        CompWindow         *window;
+        CompositeWindow    *cWindow;
 
-	    void grabNotify (int          x,
-			     int          y,
-			     unsigned int state,
-			     unsigned int mask);
+        float  xVelocity;
+        float  yVelocity;
+        int    time;
+        bool   moving;
+        bool   shouldDamage;
 
-	    void ungrabNotify ();
-	    void moveNotify (int dx,
-			     int dy,
-			     bool immediate);
-			
-	    CompWindow *window;
-	    CompositeWindow *cWindow;
+        // pointer to all the states, for use in construction and destruction
+        State* m_grabbed;
+        State* m_ungrabbed;
+        State* m_state;
 
-	    float  xVelocity;
-	    float  yVelocity;
-	    int  time;
-	    bool moving;
+        ThrowWindow (CompWindow *w);
+
+        /// when a window is grabbed we need to stop simulating it's motion 
+        /// and start recording its movement
+        void grabNotify ( int x, int y, unsigned int state, unsigned int mask);
+
+        /// when a window is released (ungrabbed) then we need to look at it's
+        /// motion over the past few frames to determine it's current
+        /// velocity
+        void ungrabNotify ();
+
+        /// when the user moves the window, we need to record the motion so
+        /// that we can determine the windows "velocity"
+        void moveNotify (int dx, int dy, bool immediate);
 };
 
-#define THROW_SCREEN(s)						       \
-    ThrowScreen *ts = ThrowScreen::get (s)
+/**
+ *
+ */
+class ThrowWindow::State
+{
+    public:
+        // forward declarations, see definintions below
+        class Grabbed;
+        class Ungrabbed;
 
-#define THROW_WINDOW(w)							\
-    ThrowWindow *tw = ThrowWindow::get (w)
+        /// pointer to the window that owns this state
+        ThrowWindow*            m_tw;
 
-#define WIN_REAL_X(w) (w->x () - w->border ().left)
-#define WIN_REAL_Y(w) (w->y () - w->border ().top)
+        /// constructor simply stores a pointer to the window that owns this
+        /// state object
+        State(ThrowWindow* window): m_tw(window) {}
 
-#define WIN_REAL_W(w) (w->width () + w->border ().left + w->border ().right)
-#define WIN_REAL_H(w) (w->height () + w->border ().top + w->border ().bottom)
+        virtual void grabNotify( ){};
+        virtual void unGrabNotify( ){};
+        virtual void moveNotify(int dx, int dy, bool immediate){};
+        virtual void preparePiaint(int ms)=0;
+};
 
+
+class ThrowWindow::State::Grabbed :
+    public ThrowWindow::State
+{
+    public:
+        Grabbed(ThrowWindow* window): State(window) {}
+        virtual void unGrabNotify( );
+        virtual void moveNotify(int dx, int dy, bool immediate);
+        virtual void preparePiaint(int ms);
+};
+
+
+class ThrowWindow::State::Ungrabbed :
+    public ThrowWindow::State
+{
+    public:
+        Ungrabbed(ThrowWindow* window): State(window) {}
+        virtual void grabNotify( );
+        virtual void preparePiaint(int ms);
+};
+
+
+/**
+ *  This class is just is for the compiz plugin API
+ */
 class ThrowPluginVTable :
     public CompPlugin::VTableForScreenAndWindow<ThrowScreen, ThrowWindow>
 {
     public:
-
-	bool init ();
+      bool init ();
 };
