@@ -34,15 +34,16 @@
 
 
 
-inline static int winActualX(CompWindow* w){ return w->x () - w->border ().left; }
-inline static int winActualY(CompWindow* w){ return w->y () - w->border ().top; }
-
 inline static int winActualW(CompWindow* w){ return w->width () + w->border ().left + w->border ().right; }
 inline static int winActualH(CompWindow* w){ return w->height () + w->border ().top + w->border ().bottom; }
 
 
 /// register the plugin with compiz
 COMPIZ_PLUGIN_20090315 (throw, ThrowPluginVTable); // 'throw' is a reserved keyword
+
+
+
+
 
 
 
@@ -62,8 +63,8 @@ void ThrowScreen::preparePaint (int ms)
         CompWindow*     w = *it;
         ThrowWindow*    tw = ThrowWindow::get (w);
 
-        tw->shouldDamage = false;
-        tw->state->preparePaint(ms);
+        tw->m_shouldDamage = false;
+        tw->m_state->preparePaint(this, ms);
     }
 
     cScreen->preparePaint (ms);
@@ -71,65 +72,85 @@ void ThrowScreen::preparePaint (int ms)
 
 
 
-void ThrowWindow::State::Grabbed::preparePaint(int ms)
+void ThrowWindow::State::Grabbed::preparePaint(ThrowScreen* ts, int ms)
 {
-    m_tw->time += ms;
-    m_tw->shouldDamage = true;
+    m_ring.bake(ms);
+    m_tw->m_shouldDamage = true;
 }
 
-void ThrowWindow::State::Ungrabbed::preparePaint(int ms)
+void ThrowWindow::State::Ungrabbed::preparePaint(ThrowScreen* ts, int ms)
 {
     // otherwise, if it's not moving but it has some finite velocity, then
     // we update it's position and integrate it's dynamics
-    if ((m_tw->xVelocity < 0.0f || m_tw->xVelocity > 0.0f)
-        || (m_tw->yVelocity < 0.0f || m_tw->yVelocity > 0.0f) )
+    if ((m_tw->m_vx < 0.0f || m_tw->m_vx > 0.0f)
+        || (m_tw->m_vy < 0.0f || m_tw->m_vy > 0.0f) )
     {
-        m_tw->shouldDamage = true;
+        CompWindow* w = m_tw->window;
+
+        m_tw->m_shouldDamage = true;
 
         // we'll stop it from moving when it's velocity get's below this
         // value
-        if ((fabsf(m_tw->xVelocity) < 0.05f) ||
-            (fabsf(m_tw->yVelocity) < 0.05f))
+        if (fabsf(m_tw->m_vx) < 0.005f)
+            m_tw->m_vx = 0.0f;
+
+        if (fabsf(m_tw->m_vy) < 0.005f)
+            m_tw->m_vy = 0.0f;
+
+        // velocity decreases with time according to friction constant
+        m_tw->m_vx /= (1.0 + (ts->optionGetFrictionConstant() / 100));
+        m_tw->m_vy /= (1.0 + (ts->optionGetFrictionConstant() / 100));
+
+        // velocity is stored in pixels per millisecond
+        float dx = roundf (m_tw->m_vx * ms);
+        float dy = roundf (m_tw->m_vy * ms);
+
+        // update the stored precise position with the deltas
+        m_tw->m_x += dx;
+        m_tw->m_y += dy;
+
+        // clamp the precise position to an integer
+        int x = roundf(m_tw->m_x);
+        int y = roundf(m_tw->m_y);
+
+
+        // if the option is set to constrain position within the current screen
+        // then clamp any positions that are outside that
+        if ( ts->optionGetConstrainX() )
         {
-            m_tw->xVelocity = 0.0f;
-            m_tw->yVelocity = 0.0f;
+            if ( x <  w->border().left )
+            {
+                x = w->border().left;
+                m_tw->m_x  = x;
+                m_tw->m_vx = 0.0f;
+            }
+            else if ( (x + w->border().left + winActualW(w) ) > screen->width() )
+            {
+                x = screen->width() - winActualW(w) - w->border().left;
+                m_tw->m_x  = x;
+                m_tw->m_vx = 0.0f;
+            }
         }
 
-        m_tw->xVelocity /= (1.0 + (m_tw->optionGetFrictionConstant() / 100));
-        m_tw->yVelocity /= (1.0 + (m_tw->optionGetFrictionConstant() / 100));
-        int dx = roundf (m_tw->xVelocity * (m_tw->optionGetVelocityX ()));
-        int dy = roundf (m_tw->yVelocity * (m_tw->optionGetVelocityY ()));
-
-        if (optionGetConstrainX ())
+        if ( ts->optionGetConstrainY() )
         {
-            if ((winActualX(w) + dx) < 0)
+            if ( y < w->border().top )
             {
-                dx = -winActualX(w);
-                m_tw->xVelocity = 0.0f;
+                //printf("clamping y because %i < %i\n",y,w->border().top);
+                y = w->border().top;
+                m_tw->m_y  = y;
+                m_tw->m_vy = 0.0f;
             }
-            else if ((winActualX(w) + winActualW(w) + dx) > screen->width ())
+            else if ( ( y - w->border().top + winActualH(w) ) > screen->height ())
             {
-                dx = screen->width() - ( winActualX(w) + winActualW(w) );
-                m_tw->xVelocity = 0.0f;
+                //printf("clamping y because %i > %i\n",( y - w->border().top + winActualH(w) ),screen->height ());
+                y = screen->height() - winActualH(w) + w->border().top;
+                m_tw->m_y  = y;
+                m_tw->m_vy = 0.0f;
             }
         }
 
-        if (optionGetConstrainY ())
-        {
-            if ( (winActualY(w) + dy) < 0)
-            {
-                dy = -winActualY(w);
-                m_tw->yVelocity = 0.0f;
-            }
-            else if ( (winActualY(w) + winActualH(w) + dy) > screen->height ())
-            {
-                dy = screen->height() - (winActualY(w) + winActualH(w));
-                m_tw->yVelocity = 0.0f;
-            }
-        }
-
-        w->move (dx, dy, true);
-        w->syncPosition ();
+        w->moveToViewportPosition(x, y, true);
     }
 }
 
@@ -144,7 +165,7 @@ void ThrowScreen::donePaint ()
     {
         CompWindow*     w = *it;
         ThrowWindow*    tw = ThrowWindow::get (w);
-        if(tw->shouldDamage)
+        if(tw->m_shouldDamage)
             tw->cWindow->addDamage();
     }
 
@@ -162,27 +183,26 @@ void ThrowWindow::grabNotify (
             unsigned int  state,
             unsigned int  mask)
 {
-
     if (mask & CompWindowGrabMoveMask)
     {
         ThrowWindow* tw = ThrowWindow::get (window);
-        tw->state->grabNotify();
+        tw->m_state->grabNotify();
     }
 
     window->grabNotify (x, y, state, mask);
-
 }
 
 
 void ThrowWindow::State::Ungrabbed::grabNotify()
 {
-    m_tw->time = 0;
-    m_tw->xVelocity = 0.0f;
-    m_tw->yVelocity = 0.0f;
-    m_tw->state = m_tw->grabbed;
+    m_tw->m_x  = m_tw->window->x();
+    m_tw->m_y  = m_tw->window->y();
+    m_tw->m_vx = 0.0f;
+    m_tw->m_vy = 0.0f;
+    m_tw->m_state = m_tw->m_grabbed;
+
+    //printf("Window state changing from ungrabbed to grabbed\n");
 }
-
-
 
 
 
@@ -190,13 +210,21 @@ void ThrowWindow::State::Ungrabbed::grabNotify()
 void ThrowWindow::ungrabNotify ()
 {
     ThrowWindow* tw = ThrowWindow::get (window);
-    tw->state->ungrabNotify();
+    tw->m_state->ungrabNotify();
     window->ungrabNotify ();
 }
 
-void ThrowWindow::State::Grabbed::unGrabNotify()
+
+void ThrowWindow::State::Grabbed::ungrabNotify()
 {
-    m_tw->state = m_tw->ungrabbed;
+    m_tw->m_state = m_tw->m_ungrabbed;
+    m_tw->m_x = m_tw->window->x();
+    m_tw->m_y = m_tw->window->y();
+    m_ring.getAverage(m_tw->m_vx,m_tw->m_vy);
+    m_ring.reset();
+
+    //printf("Window state changing from grabbed to ungrabbed\n");
+    //printf("   velocity: (%5.3f,%5.3f)\n",m_tw->m_vx,m_tw->m_vy);
 }
 
 
@@ -209,7 +237,7 @@ void ThrowWindow::moveNotify (
             bool immediate)
 {
     ThrowWindow* tw = ThrowWindow::get (window);
-    tw->state->moveNotify(dx,dy);
+    tw->m_state->moveNotify(dx,dy);
     window->moveNotify (dx, dy, immediate);
 }
 
@@ -217,16 +245,9 @@ void ThrowWindow::moveNotify (
 
 void ThrowWindow::State::Grabbed::moveNotify(
             int  dx,
-            int  dy,
-            bool immediate)
+            int  dy)
 {
-    if (m_tw->time < 1)
-        m_tw->time = 1;
-
-    m_tw->xVelocity = (float) dx / (float) tw->time;
-    m_tw->yVelocity = (float) dy / (float) tw->time;
-
-    m_tw->time = 1;
+    m_ring.store(dx,dy);
 }
 
 
@@ -253,16 +274,20 @@ ThrowWindow::ThrowWindow (CompWindow *window) :
     PluginClassHandler<ThrowWindow, CompWindow> (window),
     window (window),
     cWindow (CompositeWindow::get (window)),
-    xVelocity (0.0f),
-    yVelocity (0.0f),
-    time (0),
-    moving (false),
-    shouldDamage (false)
+    m_vx (0.0f),
+    m_vy (0.0f),
+    m_shouldDamage (false)
 {
     WindowInterface::setHandler (window);
     m_grabbed   = new ThrowWindow::State::Grabbed(this);
     m_ungrabbed = new ThrowWindow::State::Ungrabbed(this);
     m_state     = m_grabbed;
+}
+
+ThrowWindow::~ThrowWindow()
+{
+    delete m_grabbed;
+    delete m_ungrabbed;
 }
 
 
@@ -278,3 +303,60 @@ bool ThrowPluginVTable::init ()
         return false;
     return true;
 }
+
+
+
+void ThrowWindow::Ring::reset()
+{
+    i_next  = 0;
+    m_full  = false;
+    m_dx[0] = 0;
+    m_dy[0] = 0;
+}
+
+void ThrowWindow::Ring::store(int dx, int dy)
+{
+    m_dx[i_next] += dx;
+    m_dy[i_next] += dy;
+}
+
+void ThrowWindow::Ring::bake(int dt)
+{
+    m_dt[i_next++] = dt;
+
+    if(i_next > THROW_WINDOW_RING_SIZE)
+    {
+        i_next = 0;
+        m_full = true;
+    }
+
+    m_dx[i_next] = 0;
+    m_dy[i_next] = 0;
+    m_dt[i_next] = 0;
+}
+
+
+void ThrowWindow::Ring::getAverage(float& vx, float& vy)
+{
+    vx = 0;
+    vy = 0;
+
+    if(!m_full && i_next == 0)
+        return;
+
+    double dt = 0;
+
+    int i_end = m_full ? THROW_WINDOW_RING_SIZE : i_next-1;
+
+    for(int i=0; i < i_end; i++)
+    {
+        vx += m_dx[i];
+        vy += m_dy[i];
+        dt += m_dt[i];
+    }
+
+    vx /= dt;
+    vy /= dt;
+}
+
+

@@ -40,6 +40,9 @@
  * movement events from the user.
  * * In the "grabbed" state we update the current position of the window, so
  *   that we can record a delta in the frame
+ *
+ *   Note: install with make && make install
+ *   Note: get terminal output with "compiz --replace ccp & emerald --replace &"
  */
 
 #include <core/core.h>
@@ -84,15 +87,16 @@ class ThrowWindow :
     public:
         //forward declaration, see definition below
         class State;
+        class Ring;
 
         CompWindow         *window;
         CompositeWindow    *cWindow;
 
-        float  xVelocity;
-        float  yVelocity;
-        int    time;
-        bool   moving;
-        bool   shouldDamage;
+        float  m_vx;    /// x velocity in pixels per ms
+        float  m_vy;    /// y velocity in pixels per ms
+        float  m_x;     /// unrounded viewport position
+        float  m_y;     /// unrounded viewport position
+        bool   m_shouldDamage;
 
         // pointer to all the states, for use in construction and destruction
         State* m_grabbed;
@@ -100,6 +104,7 @@ class ThrowWindow :
         State* m_state;
 
         ThrowWindow (CompWindow *w);
+        ~ThrowWindow();
 
         /// when a window is grabbed we need to stop simulating it's motion 
         /// and start recording its movement
@@ -115,8 +120,10 @@ class ThrowWindow :
         void moveNotify (int dx, int dy, bool immediate);
 };
 
+
+
 /**
- *
+ *  \brief  base class for state objects. The throw window only has two states
  */
 class ThrowWindow::State
 {
@@ -133,20 +140,44 @@ class ThrowWindow::State
         State(ThrowWindow* window): m_tw(window) {}
 
         virtual void grabNotify( ){};
-        virtual void unGrabNotify( ){};
-        virtual void moveNotify(int dx, int dy, bool immediate){};
-        virtual void preparePiaint(int ms)=0;
+        virtual void ungrabNotify( ){};
+        virtual void moveNotify(int dx, int dy){};
+        virtual void preparePaint(ThrowScreen* ts, int ms)=0;
+};
+
+
+#define THROW_WINDOW_RING_SIZE 4
+
+class ThrowWindow::Ring
+{
+    private:
+        int m_dx[THROW_WINDOW_RING_SIZE];
+        int m_dy[THROW_WINDOW_RING_SIZE];
+        int m_dt[THROW_WINDOW_RING_SIZE];
+
+        bool   m_full;
+        int    i_next;
+
+    public:
+        Ring(){ reset(); }
+        void reset();
+        void store(int dx, int dy);
+        void bake(int dt);
+        void getAverage(float& dx, float& dy);
 };
 
 
 class ThrowWindow::State::Grabbed :
     public ThrowWindow::State
 {
+    private:
+        ThrowWindow::Ring m_ring;
+
     public:
         Grabbed(ThrowWindow* window): State(window) {}
-        virtual void unGrabNotify( );
-        virtual void moveNotify(int dx, int dy, bool immediate);
-        virtual void preparePiaint(int ms);
+        virtual void ungrabNotify( );
+        virtual void moveNotify(int dx, int dy);
+        virtual void preparePaint(ThrowScreen* ts, int ms);
 };
 
 
@@ -156,8 +187,11 @@ class ThrowWindow::State::Ungrabbed :
     public:
         Ungrabbed(ThrowWindow* window): State(window) {}
         virtual void grabNotify( );
-        virtual void preparePiaint(int ms);
+        virtual void preparePaint(ThrowScreen* ts, int ms);
 };
+
+
+
 
 
 /**
