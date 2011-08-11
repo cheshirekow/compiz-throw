@@ -7,6 +7,9 @@ project (compiz-plugin-throw)
 # search path
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
+# use Jan Woetzel's doxygen doc target
+include("${CMAKE_MODULE_PATH}/TargetDoc.cmake" OPTIONAL)
+
 find_package (Compiz)
 
 if( COMPIZ_FOUND )
@@ -17,5 +20,4 @@ else( COMPIZ_FOUND )
     message( "Compiz not found, configuring for doxygen only")
 endif( COMPIZ_FOUND )
 
-# use Jan Woetzel's doxygen doc target
-include("${CMAKE_MODULE_PATH}/TargetDoc.cmake" OPTIONAL)
+
