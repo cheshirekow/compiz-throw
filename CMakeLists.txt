@@ -3,6 +3,10 @@ cmake_minimum_required(VERSION 2.8)
 # defines the project name
 project (compiz-plugin-throw)
 
+# adds the project-specific cmake module directory cmake/Modules to the cmake
+# search path
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+
 find_package (Compiz)
 
 if( COMPIZ_FOUND )
